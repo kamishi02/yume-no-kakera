@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>夢のかけら</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Zen+Antique+Soft&family=Noto+Sans+JP:wght@200;300&display=swap');
+
+:root {
+  --bg: #07070e;
+  --glow: #8aadcc;
+  --soft: #c4d8ec;
+  --faint: #3a5570;
+  --word-color: #e8f4ff;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--soft);
+  font-family: 'Noto Sans JP', sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#canvas { position:fixed; inset:0; z-index:0; pointer-events:none; }
+
+#mist {
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 85%, rgba(25,45,75,0.35) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 40% at 85% 15%, rgba(15,35,65,0.25) 0%, transparent 55%);
+}
+
+#app {
+  position:relative; z-index:2;
+  height:100vh;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+
+#title {
+  font-family:'Zen Antique Soft',serif;
+  font-size:clamp(0.85rem,2.5vw,1.1rem);
+  letter-spacing:0.5em; color:var(--faint);
+  margin-bottom:52px; transition:opacity 1.5s ease;
+}
+
+#word-wrap {
+  height:200px; width:100%;
+  display:flex; align-items:center; justify-content:center;
+}
+
+#word {
+  font-family:'Zen Antique Soft',serif;
+  font-size:clamp(3rem,10vw,5.5rem);
+  color:var(--word-color); letter-spacing:0.12em;
+  text-align:center; opacity:0;
+  transform:translateY(14px) scale(0.96);
+  transition:opacity 1.4s ease, transform 1.4s ease;
+  text-shadow: 0 0 50px rgba(138,173,204,0.45), 0 0 100px rgba(138,173,204,0.18);
+  line-height:2.2;
+}
+#word.visible { opacity:1; transform:translateY(0) scale(1); }
+#word.fading  { opacity:0; transform:translateY(-10px) scale(0.96); }
+#word ruby { ruby-align:center; }
+#word rt {
+  font-size:0.26em; letter-spacing:0.08em;
+  color:rgba(138,173,204,0.6);
+  font-family:'Noto Sans JP',sans-serif; font-weight:300;
+}
+
+#loading {
+  font-size:0.6rem; letter-spacing:0.3em; color:var(--faint);
+  min-height:1.2em; opacity:0; transition:opacity 0.4s;
+  margin-top:10px; text-align:center;
+}
+#loading.on { opacity:0.5; }
+
+#controls {
+  margin-top:52px;
+  display:flex; flex-direction:column; align-items:center; gap:22px;
+}
+
+#start-btn {
+  background:none;
+  border:1px solid rgba(138,173,204,0.28);
+  color:var(--soft);
+  font-family:'Noto Sans JP',sans-serif; font-weight:200;
+  font-size:0.8rem; letter-spacing:0.5em;
+  padding:15px 44px; cursor:pointer; border-radius:80px;
+  transition:all 0.5s ease; position:relative; overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+}
+#start-btn::after {
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(ellipse at center, rgba(138,173,204,0.12) 0%, transparent 70%);
+  opacity:0; transition:opacity 0.5s;
+}
+#start-btn:hover::after, #start-btn:active::after { opacity:1; }
+#start-btn:hover, #start-btn:active {
+  border-color:rgba(138,173,204,0.6); color:var(--word-color);
+  box-shadow:0 0 28px rgba(138,173,204,0.12);
+}
+
+/* 共通スライダー行 */
+.ctrl-row {
+  display:flex; align-items:center; gap:12px;
+  font-size:0.63rem; font-weight:200; letter-spacing:0.22em; color:var(--faint);
+}
+.ctrl-row input[type=range] {
+  -webkit-appearance:none; appearance:none;
+  width:88px; height:1px; background:var(--faint); outline:none;
+}
+.ctrl-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:12px; height:12px;
+  border-radius:50%; background:var(--glow); cursor:pointer;
+}
+.ctrl-val {
+  font-size:0.6rem; letter-spacing:0.18em; color:var(--faint);
+  opacity:0.65; min-width:4em; text-align:left;
+}
+
+/* BGM セレクタ */
+#bgm-wrap {
+  display:flex; align-items:center; gap:10px;
+  font-size:0.63rem; font-weight:200; letter-spacing:0.22em; color:var(--faint);
+}
+#bgm-select {
+  background:none; border:1px solid rgba(58,85,112,0.6);
+  color:var(--soft); font-family:'Noto Sans JP',sans-serif;
+  font-size:0.62rem; font-weight:200; letter-spacing:0.1em;
+  padding:5px 10px; border-radius:20px; cursor:pointer; outline:none;
+  -webkit-tap-highlight-color:transparent;
+}
+#bgm-select option { background:#0d1a28; color:var(--soft); }
+
+#bgm-vol-wrap {
+  display:flex; align-items:center; gap:10px;
+  font-size:0.6rem; letter-spacing:0.2em; color:var(--faint);
+}
+#bgm-vol-wrap input[type=range] {
+  -webkit-appearance:none; appearance:none;
+  width:70px; height:1px; background:var(--faint); outline:none;
+}
+#bgm-vol-wrap input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:11px; height:11px;
+  border-radius:50%; background:var(--glow); cursor:pointer;
+}
+
+#timer-remain {
+  font-size:0.58rem; letter-spacing:0.3em; color:var(--glow);
+  opacity:0; transition:opacity 0.8s; min-height:1em;
+}
+#timer-remain.on { opacity:0.5; }
+
+#counter {
+  font-size:0.6rem; letter-spacing:0.35em; color:var(--faint);
+  opacity:0; transition:opacity 1s; margin-top:6px;
+}
+#counter.on { opacity:0.4; }
+
+#hint {
+  position:fixed; bottom:28px;
+  font-size:0.6rem; letter-spacing:0.35em; color:var(--faint);
+  opacity:0; transition:opacity 1.2s; cursor:pointer; z-index:10;
+  -webkit-tap-highlight-color:transparent;
+}
+#hint.on { opacity:0.32; }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+<div id="mist"></div>
+
+<div id="app">
+  <div id="title">夢　の　か　け　ら</div>
+
+  <div id="word-wrap"><div id="word"></div></div>
+
+  <div id="loading"></div>
+
+  <div id="controls">
+    <button id="start-btn">は　じ　め　る</button>
+
+    <!-- 読み上げ速度 -->
+    <div class="ctrl-row">
+      はやく
+      <input type="range" id="speed" min="3" max="14" value="7" step="0.5">
+      ゆっくり
+    </div>
+
+    <!-- BGM -->
+    <div id="bgm-wrap">
+      BGM
+      <select id="bgm-select">
+        <option value="none">無音</option>
+        <option value="cricket">🌙 夏の夜（鈴虫）</option>
+        <option value="river">💧 川の流れ</option>
+        <option value="fire">🔥 焚き火</option>
+        <option value="relax">🎵 リラクゼーション</option>
+      </select>
+    </div>
+    <div id="bgm-vol-wrap">
+      小
+      <input type="range" id="bgm-vol" min="0" max="1" value="0.4" step="0.05">
+      大
+    </div>
+
+    <!-- タイマー -->
+    <div class="ctrl-row">
+      タイマー
+      <input type="range" id="timer-slider" min="0" max="90" value="0" step="5">
+      <span class="ctrl-val" id="timer-val">なし</span>
+    </div>
+    <div id="timer-remain"></div>
+  </div>
+
+  <div id="counter"></div>
+</div>
+
+<div id="hint">タップして止める</div>
+
+<script>
+/* ===== 星空 ===== */
+(function(){
+  const cv=document.getElementById('canvas');
+  cv.width=innerWidth; cv.height=innerHeight;
+  const cx=cv.getContext('2d');
+  for(let i=0;i<200;i++){
+    const x=Math.random()*cv.width, y=Math.random()*cv.height;
+    const r=Math.random()*1.1+0.1, a=Math.random()*0.5+0.07;
+    cx.beginPath(); cx.arc(x,y,r,0,Math.PI*2);
+    cx.fillStyle=`rgba(210,228,255,${a})`; cx.fill();
+  }
+})();
+
+/* ===== 単語プール ===== */
+const LOCAL_POOL = [
+  // 自然・天気・空
+  {w:"桜",r:"さくら"},     {w:"霧",r:"きり"},       {w:"朧月",r:"おぼろづき"},
+  {w:"夕焼け",r:"ゆうやけ"},{w:"朝露",r:"あさつゆ"}, {w:"雪原",r:"ゆきはら"},
+  {w:"霜柱",r:"しもばしら"},{w:"夜霧",r:"よぎり"},   {w:"波紋",r:"はもん"},
+  {w:"雫",r:"しずく"},     {w:"渚",r:"なぎさ"},     {w:"磯",r:"いそ"},
+  {w:"棚田",r:"たなだ"},   {w:"砂丘",r:"さきゅう"}, {w:"砂浜",r:"すなはま"},
+  {w:"潮風",r:"しおかぜ"}, {w:"岬",r:"みさき"},     {w:"草原",r:"そうげん"},
+  {w:"雪",r:"ゆき"},       {w:"氷柱",r:"つらら"},   {w:"虹",r:"にじ"},
+  {w:"稲妻",r:"いなずま"}, {w:"霰",r:"あられ"},     {w:"霙",r:"みぞれ"},
+  {w:"春霞",r:"はるかすみ"},{w:"秋晴れ",r:"あきばれ"},{w:"夕暮れ",r:"ゆうぐれ"},
+  {w:"夜明け",r:"よあけ"}, {w:"真昼",r:"まひる"},   {w:"薄暮",r:"はくぼ"},
+  {w:"凪",r:"なぎ"},       {w:"吹雪",r:"ふぶき"},   {w:"陽炎",r:"かげろう"},
+  {w:"水辺",r:"みずべ"},   {w:"滝",r:"たき"},       {w:"湖",r:"みずうみ"},
+  {w:"沼",r:"ぬま"},       {w:"入江",r:"いりえ"},   {w:"川霧",r:"かわぎり"},
+  {w:"山並み",r:"やまなみ"},{w:"峠",r:"とうげ"},     {w:"谷",r:"たに"},
+  {w:"崖",r:"がけ"},       {w:"丘",r:"おか"},       {w:"野原",r:"のはら"},
+  // 植物・花
+  {w:"藤",r:"ふじ"},       {w:"蓮",r:"はす"},       {w:"萩",r:"はぎ"},
+  {w:"柚子",r:"ゆず"},     {w:"紅葉",r:"もみじ"},   {w:"竹林",r:"ちくりん"},
+  {w:"葦",r:"あし"},       {w:"蒲公英",r:"たんぽぽ"},{w:"土筆",r:"つくし"},
+  {w:"撫子",r:"なでしこ"}, {w:"葵",r:"あおい"},     {w:"菖蒲",r:"しょうぶ"},
+  {w:"芥子",r:"けし"},     {w:"桔梗",r:"ききょう"}, {w:"朝顔",r:"あさがお"},
+  {w:"向日葵",r:"ひまわり"},{w:"水仙",r:"すいせん"}, {w:"梅",r:"うめ"},
+  {w:"椿",r:"つばき"},     {w:"山茶花",r:"さざんか"},{w:"木蓮",r:"もくれん"},
+  {w:"芝",r:"しば"},       {w:"苔",r:"こけ"},       {w:"蕨",r:"わらび"},
+  {w:"松",r:"まつ"},       {w:"杉",r:"すぎ"},       {w:"白樺",r:"しらかば"},
+  {w:"銀杏",r:"いちょう"}, {w:"欅",r:"けやき"},     {w:"楠",r:"くすのき"},
+  {w:"葡萄",r:"ぶどう"},   {w:"柿",r:"かき"},       {w:"栗",r:"くり"},
+  {w:"干し柿",r:"ほしがき"},{w:"苺",r:"いちご"},     {w:"桃",r:"もも"},
+  // 動物・虫
+  {w:"蛍",r:"ほたる"},     {w:"鈴虫",r:"すずむし"}, {w:"蜻蛉",r:"とんぼ"},
+  {w:"蝶",r:"ちょう"},     {w:"蜘蛛",r:"くも"},     {w:"蟷螂",r:"かまきり"},
+  {w:"蛙",r:"かえる"},     {w:"めだか",r:"めだか"},  {w:"鯉",r:"こい"},
+  {w:"金魚",r:"きんぎょ"}, {w:"亀",r:"かめ"},       {w:"蛸",r:"たこ"},
+  {w:"烏賊",r:"いか"},     {w:"蛤",r:"はまぐり"},   {w:"牡蠣",r:"かき"},
+  {w:"雀",r:"すずめ"},     {w:"鶯",r:"うぐいす"},   {w:"郭公",r:"かっこう"},
+  {w:"鴨",r:"かも"},       {w:"鷺",r:"さぎ"},       {w:"鵜",r:"う"},
+  {w:"梟",r:"ふくろう"},   {w:"鴉",r:"からす"},     {w:"燕",r:"つばめ"},
+  {w:"狐",r:"きつね"},     {w:"狸",r:"たぬき"},     {w:"兎",r:"うさぎ"},
+  {w:"鹿",r:"しか"},       {w:"猪",r:"いのしし"},   {w:"熊",r:"くま"},
+  {w:"猿",r:"さる"},       {w:"馬",r:"うま"},       {w:"牛",r:"うし"},
+  // 食べ物・飲み物
+  {w:"枝豆",r:"えだまめ"}, {w:"土鍋",r:"どなべ"},   {w:"湯気",r:"ゆげ"},
+  {w:"焚き火",r:"たきび"}, {w:"風鈴",r:"ふうりん"}, {w:"柚子湯",r:"ゆずゆ"},
+  {w:"餅",r:"もち"},       {w:"饅頭",r:"まんじゅう"},{w:"煎餅",r:"せんべい"},
+  {w:"羊羹",r:"ようかん"}, {w:"葛餅",r:"くずもち"}, {w:"水饅頭",r:"みずまんじゅう"},
+  {w:"甘酒",r:"あまざけ"}, {w:"麦茶",r:"むぎちゃ"}, {w:"緑茶",r:"りょくちゃ"},
+  {w:"梅干し",r:"うめぼし"},{w:"沢庵",r:"たくあん"},  {w:"味噌",r:"みそ"},
+  {w:"醤油",r:"しょうゆ"}, {w:"豆腐",r:"とうふ"},   {w:"蒟蒻",r:"こんにゃく"},
+  {w:"牛蒡",r:"ごぼう"},   {w:"蓮根",r:"れんこん"}, {w:"筍",r:"たけのこ"},
+  {w:"南瓜",r:"かぼちゃ"}, {w:"茄子",r:"なす"},     {w:"胡瓜",r:"きゅうり"},
+  {w:"西瓜",r:"すいか"},   {w:"林檎",r:"りんご"},   {w:"蜜柑",r:"みかん"},
+  // 道具・器物
+  {w:"提灯",r:"ちょうちん"},{w:"行灯",r:"あんどん"},  {w:"燈籠",r:"とうろう"},
+  {w:"算盤",r:"そろばん"}, {w:"独楽",r:"こま"},     {w:"竹馬",r:"たけうま"},
+  {w:"瓢箪",r:"ひょうたん"},{w:"釜",r:"かま"},       {w:"鉄瓶",r:"てつびん"},
+  {w:"急須",r:"きゅうす"}, {w:"湯飲み",r:"ゆのみ"}, {w:"茶碗",r:"ちゃわん"},
+  {w:"箸",r:"はし"},       {w:"折り箱",r:"おりばこ"},{w:"重箱",r:"じゅうばこ"},
+  {w:"風呂敷",r:"ふろしき"},{w:"竹籠",r:"たけかご"}, {w:"笊",r:"ざる"},
+  {w:"熊手",r:"くまで"},   {w:"水筒",r:"すいとう"}, {w:"凧",r:"たこ"},
+  {w:"瓦",r:"かわら"},     {w:"煙突",r:"えんとつ"}, {w:"水車",r:"すいしゃ"},
+  {w:"灯台",r:"とうだい"}, {w:"風見鶏",r:"かざみどり"},{w:"錨",r:"いかり"},
+  {w:"算木",r:"さんぎ"},   {w:"手毬",r:"てまり"},   {w:"扇子",r:"せんす"},
+  {w:"団扇",r:"うちわ"},   {w:"蚊帳",r:"かや"},     {w:"簾",r:"すだれ"},
+  {w:"屏風",r:"びょうぶ"}, {w:"欄間",r:"らんま"},   {w:"障子",r:"しょうじ"},
+  // 場所・建物・風景
+  {w:"縁側",r:"えんがわ"}, {w:"石畳",r:"いしだたみ"},{w:"石垣",r:"いしがき"},
+  {w:"軒先",r:"のきさき"}, {w:"欄干",r:"らんかん"},  {w:"鴨居",r:"かもい"},
+  {w:"畳",r:"たたみ"},     {w:"土間",r:"どま"},     {w:"茅葺き",r:"かやぶき"},
+  {w:"水甕",r:"みずがめ"}, {w:"麦畑",r:"むぎばたけ"},{w:"電柱",r:"でんちゅう"},
+  {w:"踏切",r:"ふみきり"}, {w:"桟橋",r:"さんばし"},  {w:"石段",r:"いしだん"},
+  {w:"鳥居",r:"とりい"},   {w:"社",r:"やしろ"},     {w:"祠",r:"ほこら"},
+  {w:"蔵",r:"くら"},       {w:"茶室",r:"ちゃしつ"}, {w:"井戸",r:"いど"},
+  {w:"土塀",r:"どべい"},   {w:"小屋",r:"こや"},     {w:"物置",r:"ものおき"},
+  {w:"港",r:"みなと"},     {w:"波止場",r:"はとば"},  {w:"浜小屋",r:"はまごや"},
+  {w:"番屋",r:"ばんや"},   {w:"駅舎",r:"えきしゃ"}, {w:"踏台",r:"ふみだい"},
+  // 乗り物
+  {w:"帆船",r:"はんせん"},  {w:"舟",r:"ふね"},       {w:"筏",r:"いかだ"},
+  {w:"荷車",r:"にぐるま"}, {w:"人力車",r:"じんりきしゃ"},{w:"馬車",r:"ばしゃ"},
+  {w:"自転車",r:"じてんしゃ"},{w:"汽車",r:"きしゃ"},  {w:"機関車",r:"きかんしゃ"},
+  // 衣類・布
+  {w:"浴衣",r:"ゆかた"},   {w:"着物",r:"きもの"},   {w:"半纏",r:"はんてん"},
+  {w:"草鞋",r:"わらじ"},   {w:"下駄",r:"げた"},     {w:"足袋",r:"たび"},
+  {w:"笠",r:"かさ"},       {w:"頭巾",r:"ずきん"},   {w:"前掛け",r:"まえかけ"},
+  {w:"手拭い",r:"てぬぐい"},{w:"暖簾",r:"のれん"},   {w:"藁",r:"わら"},
+  // その他
+  {w:"水面",r:"みなも"},   {w:"木漏れ日",r:"こもれび"},{w:"夕霧",r:"ゆうぎり"},
+  {w:"朝靄",r:"あさもや"}, {w:"残雪",r:"ざんせつ"},  {w:"霧氷",r:"むひょう"},
+
+  // 天文・宇宙・時
+  {w:"銀河",r:"ぎんが"},   {w:"彗星",r:"すいせい"},  {w:"流星",r:"りゅうせい"},
+  {w:"星屑",r:"ほしくず"}, {w:"月影",r:"つきかげ"},  {w:"日暈",r:"ひがさ"},
+  {w:"黎明",r:"れいめい"}, {w:"黄昏",r:"たそがれ"},  {w:"深夜",r:"しんや"},
+  // 音・感覚
+  {w:"木霊",r:"こだま"},   {w:"潮騒",r:"しおさい"},  {w:"風音",r:"かざおと"},
+  {w:"鐘",r:"かね"},       {w:"太鼓",r:"たいこ"},    {w:"笛",r:"ふえ"},
+  {w:"三味線",r:"しゃみせん"},{w:"琴",r:"こと"},      {w:"尺八",r:"しゃくはち"},
+  // 地名・方角っぽいもの
+  {w:"北風",r:"きたかぜ"}, {w:"東風",r:"こち"},      {w:"南風",r:"みなみかぜ"},
+  {w:"山道",r:"やまみち"}, {w:"海道",r:"かいどう"},  {w:"街道",r:"かいどう"},
+  // 食材・調理
+  {w:"昆布",r:"こんぶ"},   {w:"鰹節",r:"かつおぶし"},{w:"胡麻",r:"ごま"},
+  {w:"生姜",r:"しょうが"}, {w:"山椒",r:"さんしょう"},{w:"七味",r:"しちみ"},
+  {w:"鍋",r:"なべ"},       {w:"竈",r:"かまど"},      {w:"囲炉裏",r:"いろり"},
+  // 雑貨・文具
+  {w:"硯",r:"すずり"},     {w:"墨",r:"すみ"},        {w:"筆",r:"ふで"},
+  {w:"巻物",r:"まきもの"}, {w:"封蝋",r:"ふうろう"},  {w:"印鑑",r:"いんかん"},
+  {w:"鍵",r:"かぎ"},       {w:"錠前",r:"じょうまえ"},{w:"虫眼鏡",r:"むしめがね"},
+  {w:"望遠鏡",r:"ぼうえんきょう"},{w:"羅針盤",r:"らしんばん"},{w:"砂時計",r:"すなどけい"},
+  // 職業道具
+  {w:"鋸",r:"のこぎり"},   {w:"鑿",r:"のみ"},        {w:"鉋",r:"かんな"},
+  {w:"金床",r:"かなとこ"}, {w:"ふいご",r:"ふいご"},  {w:"天秤",r:"てんびん"},
+  {w:"枡",r:"ます"},       {w:"升",r:"ます"},        {w:"物差し",r:"ものさし"},
+  // 風物詩
+  {w:"花火",r:"はなび"},   {w:"盆踊り",r:"ぼんおどり"},{w:"七夕",r:"たなばた"},
+  {w:"お神輿",r:"おみこし"},{w:"凧揚げ",r:"たこあげ"}, {w:"雪だるま",r:"ゆきだるま"},
+  {w:"雪合戦",r:"ゆきがっせん"},{w:"節分",r:"せつぶん"},{w:"お月見",r:"おつきみ"},
+];
+
+/* ===== 状態 ===== */
+let running=false, wordCount=0, queue=[], isFetching=false;
+let speechUnlocked=false, loopActive=false, stopTimerId=null;
+
+const wordEl      = document.getElementById('word');
+const loadingEl   = document.getElementById('loading');
+const counterEl   = document.getElementById('counter');
+const hintEl      = document.getElementById('hint');
+const startBtn    = document.getElementById('start-btn');
+const titleEl     = document.getElementById('title');
+const speedEl     = document.getElementById('speed');
+const timerSlider = document.getElementById('timer-slider');
+const timerValEl  = document.getElementById('timer-val');
+const timerRemain = document.getElementById('timer-remain');
+const bgmSelect   = document.getElementById('bgm-select');
+const bgmVol      = document.getElementById('bgm-vol');
+
+/* ===== Web Audio BGM ===== */
+let audioCtx = null;
+let bgmNodes = [];   // 停止用に保持
+
+function getCtx(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function stopBgm(){
+  bgmNodes.forEach(n=>{ try{ n.stop(); }catch(e){} });
+  bgmNodes=[];
+}
+
+/* ホワイト/ピンク/ブラウンノイズバッファ生成 */
+function makeNoiseBuffer(ctx, type='brown', sec=4){
+  const sr=ctx.sampleRate, len=sr*sec;
+  const buf=ctx.createBuffer(1,len,sr);
+  const d=buf.getChannelData(0);
+  let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+  for(let i=0;i<len;i++){
+    const wh=(Math.random()*2-1);
+    if(type==='white'){ d[i]=wh*0.5; }
+    else if(type==='pink'){
+      b0=0.99886*b0+wh*0.0555179; b1=0.99332*b1+wh*0.0750759;
+      b2=0.96900*b2+wh*0.1538520; b3=0.86650*b3+wh*0.3104856;
+      b4=0.55000*b4+wh*0.5329522; b5=-0.7616*b5-wh*0.0168980;
+      d[i]=(b0+b1+b2+b3+b4+b5+b6+wh*0.5362)*0.11;
+      b6=wh*0.115926;
+    } else { // brown
+      b0=(b0+0.02*wh)/1.02;
+      d[i]=b0*3.5;
+    }
+  }
+  return buf;
+}
+
+function loopNoise(ctx, buf, gainVal){
+  const src=ctx.createBufferSource();
+  src.buffer=buf; src.loop=true;
+  const g=ctx.createGain(); g.gain.value=gainVal;
+  src.connect(g); g.connect(ctx.destination);
+  src.start();
+  return [src,g];
+}
+
+/* --- 鈴虫：ループするサイン波バースト群 --- */
+function startCricket(ctx, vol){
+  const master=ctx.createGain(); master.gain.value=vol;
+  master.connect(ctx.destination);
+  bgmNodes.push(master);
+
+  // ブラウンノイズで夜のアンビエント
+  const nb=makeNoiseBuffer(ctx,'brown',4);
+  const [ns,ng]=loopNoise(ctx,nb,0.06);
+  ng.disconnect(); ng.connect(master);
+  bgmNodes.push(ns);
+
+  // 鈴虫の鳴き声：周期的なサイン波バースト
+  const CHIRPS=[
+    {freq:4200,dur:0.04,gap:0.06,rep:4,interval:0.8,pan:-0.3},
+    {freq:3900,dur:0.04,gap:0.06,rep:4,interval:1.1,pan:0.4},
+    {freq:4500,dur:0.035,gap:0.055,rep:3,interval:1.4,pan:0.0},
+  ];
+  CHIRPS.forEach(c=>{
+    function scheduleChirp(){
+      if(bgmNodes.indexOf(master)<0) return;
+      const now=ctx.currentTime;
+      for(let i=0;i<c.rep;i++){
+        const t=now+i*(c.dur+c.gap);
+        const osc=ctx.createOscillator();
+        const env=ctx.createGain();
+        const pan=ctx.createStereoPanner();
+        osc.type='sine'; osc.frequency.value=c.freq;
+        env.gain.setValueAtTime(0,t);
+        env.gain.linearRampToValueAtTime(0.18,t+0.005);
+        env.gain.linearRampToValueAtTime(0,t+c.dur);
+        pan.pan.value=c.pan;
+        osc.connect(env); env.connect(pan); pan.connect(master);
+        osc.start(t); osc.stop(t+c.dur+0.01);
+      }
+      const jitter=(Math.random()-0.5)*0.3;
+      setTimeout(scheduleChirp,(c.interval+jitter)*1000);
+    }
+    setTimeout(scheduleChirp, Math.random()*800);
+  });
+}
+
+/* --- 川：フィルタードノイズ --- */
+function startRiver(ctx, vol){
+  const master=ctx.createGain(); master.gain.value=vol;
+  master.connect(ctx.destination);
+  bgmNodes.push(master);
+
+  // 複数レイヤーのノイズをフィルタで川っぽく
+  [[220,'lowpass',1.2],[800,'bandpass',0.8],[1800,'bandpass',0.3]].forEach(([freq,type,gv])=>{
+    const buf=makeNoiseBuffer(ctx,'white',4);
+    const [src,g]=loopNoise(ctx,buf,gv);
+    g.disconnect();
+    const filt=ctx.createBiquadFilter();
+    filt.type=type; filt.frequency.value=freq; filt.Q.value=0.8;
+    g.connect(filt); filt.connect(master);
+    bgmNodes.push(src);
+    // ゆらぎ LFO
+    const lfo=ctx.createOscillator();
+    const lfoG=ctx.createGain(); lfoG.gain.value=freq*0.15;
+    lfo.frequency.value=0.07+Math.random()*0.05;
+    lfo.connect(lfoG); lfoG.connect(filt.frequency);
+    lfo.start(); bgmNodes.push(lfo);
+  });
+}
+
+/* --- 焚き火：クラックルノイズ＋低周波ゆらぎ --- */
+function startFire(ctx, vol){
+  const master=ctx.createGain(); master.gain.value=vol;
+  master.connect(ctx.destination);
+  bgmNodes.push(master);
+
+  // ベースのロー
+  const buf=makeNoiseBuffer(ctx,'brown',4);
+  const [src,g]=loopNoise(ctx,buf,1.0);
+  g.disconnect();
+  const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=400;
+  g.connect(lp); lp.connect(master);
+  bgmNodes.push(src);
+
+  // クラックル：ランダムな短いノイズバースト
+  function crackle(){
+    if(bgmNodes.indexOf(master)<0) return;
+    const now=ctx.currentTime;
+    const buf2=ctx.createBuffer(1,ctx.sampleRate*0.02,ctx.sampleRate);
+    const d=buf2.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*0.3));
+    const s=ctx.createBufferSource(); s.buffer=buf2;
+    const g2=ctx.createGain(); g2.gain.value=Math.random()*0.3+0.05;
+    const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1500;
+    s.connect(hp); hp.connect(g2); g2.connect(master);
+    s.start(now);
+    setTimeout(crackle, 80+Math.random()*400);
+  }
+  crackle();
+
+  // ゆらぎLFO
+  const lfo=ctx.createOscillator();
+  const lg=ctx.createGain(); lg.gain.value=0.15;
+  lfo.frequency.value=0.3+Math.random()*0.2;
+  lfo.connect(lg); lg.connect(master.gain);
+  lfo.start(); bgmNodes.push(lfo);
+}
+
+/* --- リラクゼーション：ドローン＋倍音 --- */
+function startRelax(ctx, vol){
+  const master=ctx.createGain(); master.gain.value=vol;
+  master.connect(ctx.destination);
+  bgmNodes.push(master);
+
+  // ドローン和音: A2, E3, A3, C#4 (110, 165, 220, 277 Hz)
+  [110,165,220,277,330].forEach((freq,i)=>{
+    const osc=ctx.createOscillator();
+    const g=ctx.createGain();
+    const pan=ctx.createStereoPanner();
+    osc.type= i<2 ? 'sine' : 'triangle';
+    osc.frequency.value=freq;
+    g.gain.value=0.08/(i*0.5+1);
+    pan.pan.value=(Math.random()-0.5)*0.6;
+
+    // ゆったりビブラート
+    const vib=ctx.createOscillator();
+    const vg=ctx.createGain(); vg.gain.value=freq*0.004;
+    vib.frequency.value=0.25+Math.random()*0.15;
+    vib.connect(vg); vg.connect(osc.frequency);
+    vib.start(); bgmNodes.push(vib);
+
+    // ゆっくりフェードイン
+    g.gain.setValueAtTime(0,ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.08/(i*0.5+1),ctx.currentTime+3);
+
+    osc.connect(g); g.connect(pan); pan.connect(master);
+    osc.start(); bgmNodes.push(osc);
+  });
+
+  // やわらかいノイズアンビ
+  const nb=makeNoiseBuffer(ctx,'pink',4);
+  const [ns,ng]=loopNoise(ctx,nb,0.04);
+  ng.disconnect();
+  const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=600;
+  ng.connect(lp); lp.connect(master);
+  bgmNodes.push(ns);
+}
+
+function startBgm(){
+  stopBgm();
+  const type=bgmSelect.value;
+  if(type==='none') return;
+  const ctx=getCtx();
+  const vol=parseFloat(bgmVol.value);
+  if(type==='cricket') startCricket(ctx,vol);
+  else if(type==='river') startRiver(ctx,vol);
+  else if(type==='fire') startFire(ctx,vol);
+  else if(type==='relax') startRelax(ctx,vol);
+}
+
+bgmVol.addEventListener('input',()=>{
+  // 再生中なら音量だけ更新（masterGainがbgmNodes[0]）
+  if(bgmNodes.length && bgmNodes[0].gain){
+    bgmNodes[0].gain.value=parseFloat(bgmVol.value);
+  }
+});
+
+/* ===== タイマー ===== */
+function fmtMin(sec){
+  const m=Math.floor(sec/60), s=sec%60;
+  return s===0 ? `${m}分` : `${m}分${s}秒`;
+}
+timerSlider.addEventListener('input',()=>{
+  const v=parseInt(timerSlider.value);
+  timerValEl.textContent= v===0 ? 'なし' : `${v}分`;
+});
+function startStopTimer(){
+  if(stopTimerId){ clearInterval(stopTimerId); stopTimerId=null; }
+  const mins=parseInt(timerSlider.value);
+  if(mins===0){ timerRemain.classList.remove('on'); return; }
+  let remaining=mins*60;
+  timerRemain.textContent=fmtMin(remaining)+' で停止';
+  timerRemain.classList.add('on');
+  stopTimerId=setInterval(()=>{
+    remaining--;
+    if(remaining<=0){
+      clearInterval(stopTimerId); stopTimerId=null;
+      timerRemain.classList.remove('on');
+      stopSession();
+    } else {
+      timerRemain.textContent=fmtMin(remaining)+' で停止';
+    }
+  },1000);
+}
+
+/* ===== 音声合成 ===== */
+let jaVoice=null;
+function loadVoices(){
+  if(!window.speechSynthesis) return;
+  const vs=speechSynthesis.getVoices();
+  jaVoice=vs.find(v=>v.lang==='ja-JP')||vs.find(v=>v.lang.startsWith('ja'))||null;
+}
+if(window.speechSynthesis){
+  loadVoices();
+  speechSynthesis.onvoiceschanged=loadVoices;
+}
+
+function unlockSpeech(cb){
+  if(speechUnlocked){ cb&&cb(); return; }
+  if(!window.speechSynthesis){ speechUnlocked=true; cb&&cb(); return; }
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance('\u200b');
+  u.volume=0.01; u.rate=2; u.lang='ja-JP';
+  if(jaVoice) u.voice=jaVoice;
+  u.onend=()=>{ speechUnlocked=true; cb&&cb(); };
+  u.onerror=()=>{ speechUnlocked=true; cb&&cb(); };
+  speechSynthesis.speak(u);
+}
+
+function speakWord(yomi){
+  if(!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(yomi);
+  u.lang='ja-JP'; u.rate=0.72; u.pitch=0.9; u.volume=1.0;
+  if(jaVoice) u.voice=jaVoice;
+  speechSynthesis.speak(u);
+}
+
+/* ===== API フェッチ ===== */
+async function fetchWords(){
+  console.log("fetchWords called, isFetching:", isFetching);
+  if(isFetching) return;
+  isFetching=true;
+  loadingEl.textContent='言葉を紡いでいます…'; loadingEl.classList.add('on');
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-6", max_tokens:700,
+        messages:[{role:"user",content:
+`認知シャッフル睡眠法のための日本語の単語を20個生成してください。
+条件：名詞・情景語のみ、動詞・感情語・抽象語は不可、前後の単語がなるべく意味的に繋がらないようジャンルを散らす、具体的・感覚的な言葉（食べ物・乗り物・自然・道具・場所・動物など混在）、読み仮名（ひらがな）を付ける。
+以下のJSON配列形式のみで返す（説明文・コードブロック記号は不要）：
+[{"w":"枝豆","r":"えだまめ"},{"w":"電柱","r":"でんちゅう"}]`
+        }]
+      })
+    });
+    const data=await res.json();
+    const txt=(data.content?.[0]?.text||'').replace(/```[a-z]*/g,'').replace(/```/g,'');
+    const m=txt.match(/\[[\s\S]*?\]/);
+    if(m){
+      const parsed=JSON.parse(m[0]);
+      if(Array.isArray(parsed)&&parsed.length){
+        queue.push(...parsed.filter(x=>x&&x.w&&x.r));
+        isFetching=false; loadingEl.classList.remove('on'); return;
+      }
+    }
+    throw new Error('parse fail');
+  }catch(e){
+    console.error('API error:', e);
+    loadingEl.textContent='（ローカル語を使用中）'; loadingEl.classList.add('on');
+    setTimeout(()=>loadingEl.classList.remove('on'), 2000);
+    const s=[...LOCAL_POOL].sort(()=>Math.random()-0.5);
+    queue.push(...s.slice(0,15));
+  }
+  isFetching=false; loadingEl.classList.remove('on');
+}
+
+/* ===== ループ ===== */
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function renderWord(item){ wordEl.innerHTML=`<ruby>${item.w}<rt>${item.r}</rt></ruby>`; }
+
+async function loop(){
+  loopActive=true;
+  while(running){
+    if(queue.length<5&&!isFetching) fetchWords();
+    if(queue.length===0){
+      loadingEl.textContent='言葉を紡いでいます…'; loadingEl.classList.add('on');
+      await fetchWords(); loadingEl.classList.remove('on');
+    }
+    if(!running) break;
+    const item=queue.shift();
+    wordCount++; counterEl.textContent=`${wordCount} 語`;
+    wordEl.classList.remove('fading');
+    renderWord(item);
+    void wordEl.offsetWidth;
+    wordEl.classList.add('visible');
+    speakWord(item.r||item.w);
+    const ms=parseFloat(speedEl.value)*1000;
+    await sleep(ms);
+    if(!running) break;
+    wordEl.classList.remove('visible'); wordEl.classList.add('fading');
+    await sleep(1300);
+  }
+  loopActive=false;
+}
+
+/* ===== 開始 / 停止 ===== */
+function startSession(){
+  // AudioContext と speechSynthesis を両方ユーザー操作内で起動
+  getCtx();
+  unlockSpeech(async ()=>{
+    running=true; wordCount=0; queue=[];
+    startBtn.textContent='止　め　る';
+    titleEl.style.opacity='0.2';
+    counterEl.classList.add('on');
+    setTimeout(()=>{ if(running) hintEl.classList.add('on'); },4000);
+    startBgm();
+    startStopTimer();
+    await fetchWords();
+    if(running&&!loopActive) loop();
+  });
+}
+
+function stopSession(){
+  running=false;
+  if(stopTimerId){ clearInterval(stopTimerId); stopTimerId=null; }
+  stopBgm();
+  if(window.speechSynthesis) speechSynthesis.cancel();
+  wordEl.classList.remove('visible','fading');
+  wordEl.innerHTML=`<ruby>おやすみ<rt>おやすみ</rt></ruby>`;
+  void wordEl.offsetWidth;
+  wordEl.classList.add('visible');
+  startBtn.textContent='は　じ　め　る';
+  titleEl.style.opacity='1';
+  counterEl.classList.remove('on');
+  hintEl.classList.remove('on');
+  timerRemain.classList.remove('on');
+  loadingEl.classList.remove('on');
+}
+
+startBtn.addEventListener('click',()=>{ running?stopSession():startSession(); });
+hintEl.addEventListener('click',stopSession);
+
+window.addEventListener('load',()=>{
+  loadVoices();
+  setTimeout(()=>{
+    wordEl.innerHTML=`<ruby>眠<rt>ねむ</rt></ruby>りへ`;
+    void wordEl.offsetWidth;
+    wordEl.classList.add('visible');
+  },500);
+});
+</script>
+</body>
+</html>
